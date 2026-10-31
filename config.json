@@ -1,0 +1,17 @@
+{
+  "sharpRendering": true,
+  "renderScale": "auto",
+  "maxRenderScale": 3,
+  "fpsLimit": 60,
+  "skipHiddenRendering": true,
+  "filterCache": true,
+  "engineTaskFix": false,
+  "fpsOverlayHotkey": true,
+  "rememberWindow": true,
+  "fullscreenHotkey": true,
+  "screenshotHotkey": true,
+  "fixBrokenAssets": true,
+  "disableAnalytics": false,
+  "steamOverlayFix": true,
+  "extraChromiumFlags": []
+}
