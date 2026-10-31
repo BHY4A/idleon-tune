@@ -21,7 +21,7 @@ import patches
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_GAME = r"C:\Program Files (x86)\Steam\steamapps\common\Legends of Idleon"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 
 def sha256(path):
