@@ -103,7 +103,7 @@ Option 1 prints this line with your real path at the end. The copy ignores the e
 | F11 / Alt+Enter (`fullscreenHotkey`) | Fullscreen. The game's 32 px title bar is hidden in fullscreen, so the game fills the whole screen instead of being letterboxed. |
 | F12 (`screenshotHotkey`) | Full-resolution screenshot to `Pictures\IdleOn`. |
 | Remember window (`rememberWindow`) | Size, position, maximized and fullscreen state. |
-| Broken assets (`fixBrokenAssets`) | The CSS points at `/static/...`, which resolves to `C:\static\...` under `file://`, so the custom cursor and the sign-in fonts never load. |
+| Broken assets (`fixBrokenAssets`) | The CSS points at `/static/...`, which resolves to `C:\static\...` under `file://`, so the custom cursor and the sign-in fonts never load. On top of that, the engine (Lime) overwrote the cursor on every hover; ordinary cursors now stay the game's cursor, while text, wait and resize cursors keep their system look. |
 | No analytics (`disableAnalytics`, off by default) | Skips loading Google Analytics, which the game initialises but never sends events to. Tested: the Google Tag Manager request is gone and sign-in is restored exactly as without it. |
 | Steam overlay (`steamOverlayFix`) | The game's own flags for the Steam overlay (`--in-process-gpu`). |
 | Extra flags (`extraChromiumFlags`) | Extra Chromium switches, for example `["ignore-gpu-blocklist"]`. |

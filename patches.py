@@ -258,6 +258,13 @@ def p_broken_assets(f, cfg, version):
     f.set(css, text)
     f.set("distBuild/main.css", replace(f.get("distBuild/main.css"),
         'url("/cursor3.png")', 'url("static/cursor3.png")', None))
+    # Lime's setCursor writes "default"/"pointer"/"auto" straight onto the game
+    # element on every hover, which overrides the CSS cursor. Swap those three
+    # for the game's cursor; text, wait and resize cursors stay as they are.
+    f.set(N_JS, replace(f.get(N_JS),
+        'case 10:case 11:t="wait";break;default:t="auto"}this.parent.element.style.cursor=t}',
+        'case 10:case 11:t="wait";break;default:t="auto"}this.parent.element.style.cursor='
+        '"default"==t||"pointer"==t||"auto"==t?\'url("../cursor3.png"), auto\':t}'))
 
 
 PATCHES = [
