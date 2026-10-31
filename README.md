@@ -44,12 +44,23 @@ If the game is not in the default Steam folder, run it from a command prompt wit
 IdleOnTune.bat --game "D:\SteamLibrary\steamapps\common\Legends of Idleon"
 ```
 
-### About the Electron 44 copy
+### How the Electron 44 copy is built
 
-- Electron 44.8.0 comes from the official GitHub release; its SHA-256 is checked against the release's `SHASUMS256.txt`.
-- [steamworks.js](https://github.com/ceifa/steamworks.js) 0.4.0 comes from npm and is checked against its integrity hash. It replaces the game's old `greenworks` Steam module: Steam sign-in, rich presence, achievements, Steam purchases, Steam Deck keyboard.
-- The copy is built in `%LOCALAPPDATA%\IdleOnTune\runtime` and uses its own browser profile, `legends-of-idleon-modern`. A newer Chromium upgrades a profile in place, so the stock game must not share one.
-- On the first build, the stock game's profile is copied over so you stay signed in with the same account.
+Option 1 shows each step as it runs:
+
+1. **Checks the game**: takes the game's current `app.asar` from your Steam folder (or the untouched `app.asar.vanilla` if option 2 patched the Steam game).
+2. **Downloads [Electron](https://www.electronjs.org/) 44.8.0** from the [official GitHub release](https://github.com/electron/electron/releases/tag/v44.8.0) and checks its SHA-256 against the release's `SHASUMS256.txt`.
+3. **Downloads [steamworks.js](https://github.com/ceifa/steamworks.js) 0.4.0** from [npm](https://www.npmjs.com/package/steamworks.js) and checks it against npm's integrity hash. It replaces the game's old `greenworks` Steam module: Steam sign-in, rich presence, achievements, Steam purchases, Steam Deck keyboard.
+4. **Lays out the new engine** in a temporary folder.
+5. **Patches the game code**: unpacks `app.asar`, applies the patches (including the changes the game needs on a current Electron) and packs it again.
+6. **Installs**: only now replaces `%LOCALAPPDATA%\IdleOnTune\runtime`.
+7. **Profile and shortcut**: on the first build copies the stock game's browser profile so you stay signed in, and creates the desktop shortcut.
+
+Downloads are cached in `%LOCALAPPDATA%\IdleOnTune\downloads`, so later builds take seconds.
+
+**Game updates:** the game's own code comes from your Steam installation every time, so after a Steam update you just run option 1 again. If an update changes code the Electron 44 copy cannot run without, step 5 stops with a message and your previous copy stays as it was. Optional patches whose code moved are skipped and listed.
+
+The copy uses its own browser profile, `legends-of-idleon-modern`: a newer Chromium upgrades a profile in place, so the stock game must not share one.
 
 **About signing in:** "Sign in with Steam" logs into the account `steam_<SteamID>`. If your account is a Google or e-mail one, that is a *different, empty* account. Use the copied profile, or sign in the same way you normally do.
 

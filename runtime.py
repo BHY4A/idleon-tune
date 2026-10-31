@@ -53,14 +53,34 @@ def fetch(url):
         return r.read()
 
 
+def download(url, path):
+    """Downloads with a progress bar."""
+    with urllib.request.urlopen(url) as r, open(path, "wb") as out:
+        total = int(r.headers.get("Content-Length") or 0)
+        done = 0
+        while True:
+            chunk = r.read(1 << 16)
+            if not chunk:
+                break
+            out.write(chunk)
+            done += len(chunk)
+            if total:
+                pct = done * 100 // total
+                bar = "#" * (pct // 4)
+                sys.stdout.write("\r      [%-25s] %3d%%  %.1f / %.1f MB" % (bar, pct, done / 1e6, total / 1e6))
+                sys.stdout.flush()
+    if total:
+        sys.stdout.write("\n")
+
+
 def cached(name, url):
     os.makedirs(CACHE, exist_ok=True)
     path = os.path.join(CACHE, name)
-    if not os.path.exists(path):
-        print("Downloading " + url)
-        data = fetch(url)
-        with open(path + ".part", "wb") as fh:
-            fh.write(data)
+    if os.path.exists(path):
+        print("      already downloaded: " + name)
+    else:
+        print("      downloading " + url)
+        download(url, path + ".part")
         os.replace(path + ".part", path)
     with open(path, "rb") as fh:
         return fh.read()
@@ -75,6 +95,7 @@ def get_electron():
     if hashlib.sha256(data).hexdigest() != expected:
         os.remove(os.path.join(CACHE, name))
         sys.exit("Electron download failed the SHA-256 check; run build again.")
+    print("      SHA-256 matches the official release")
     return data
 
 
@@ -86,6 +107,7 @@ def get_steamworks():
     if base64.b64encode(hashlib.new(algo, data).digest()).decode() != digest:
         os.remove(os.path.join(CACHE, "steamworks.js-%s.tgz" % STEAMWORKS_VERSION))
         sys.exit("steamworks.js download failed the integrity check; run build again.")
+    print("      integrity hash matches npm")
     return data
 
 
@@ -97,12 +119,13 @@ def running(dest):
 
 def copy_profile():
     if os.path.isdir(MODERN_PROFILE):
+        print("      profile already there: " + MODERN_PROFILE)
         return
     if not os.path.isdir(PROFILE):
         print("No stock game profile found; you will sign in from scratch.")
         return
     shutil.copytree(PROFILE, MODERN_PROFILE, ignore=lambda d, names: [n for n in names if n in PROFILE_SKIP])
-    print("Copied the stock game profile (sign-in) to " + MODERN_PROFILE)
+    print("      copied the stock game profile (sign-in) to " + MODERN_PROFILE)
 
 
 def desktop_dir():
@@ -124,10 +147,21 @@ def shortcut(dest, game):
           "$s.WorkingDirectory=$env:IT_DEST;$s.IconLocation=$env:IT_ICON+',0';$s.Save()")
     env = dict(os.environ, IT_LINK=link, IT_EXE=exe, IT_DEST=dest, IT_ICON=icon)
     subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=False, env=env)
-    print("Desktop shortcut: " + link)
+    print("      desktop shortcut: " + link)
+
+
+# Without these the copy does not run on the new Electron; a game update that
+# moves their code stops the build instead of producing a broken copy.
+REQUIRED = {"renderer script", "game loop while hidden", "modern Electron support"}
+STEPS = 7
+
+
+def step(n, text):
+    print("\n[%d/%d] %s" % (n, STEPS, text))
 
 
 def build(game, dest, make_shortcut=True):
+    step(1, "Checking the game")
     src_asar = os.path.join(game, "resources", "app.asar")
     if not os.path.exists(src_asar):
         sys.exit("Game not found in " + game)
@@ -138,39 +172,68 @@ def build(game, dest, make_shortcut=True):
         sys.exit("The Steam game is modded but has no backup; verify the game files in Steam first.")
     if running(dest):
         sys.exit("Close the game first.")
+    print("      game files: " + src_asar)
+
+    step(2, "Electron %s (github.com/electron/electron)" % ELECTRON_VERSION)
     electron = get_electron()
+    step(3, "steamworks.js %s (npmjs.com/package/steamworks.js)" % STEAMWORKS_VERSION)
     steamworks = get_steamworks()
 
-    if os.path.isdir(dest):
-        shutil.rmtree(dest)
-    os.makedirs(dest)
-    with zipfile.ZipFile(io.BytesIO(electron)) as z:
-        z.extractall(dest)
-    os.remove(os.path.join(dest, "resources", "default_app.asar"))
-    os.replace(os.path.join(dest, "electron.exe"), os.path.join(dest, "LegendsOfIdleon.exe"))
-    with open(os.path.join(dest, "steam_appid.txt"), "w") as fh:
-        fh.write(APP_ID)
-    modules = os.path.join(dest, "resources", "app.asar.unpacked", "node_modules")
-    os.makedirs(modules)
-    with tarfile.open(fileobj=io.BytesIO(steamworks)) as t:
-        t.extractall(modules, filter="data")
-    os.rename(os.path.join(modules, "package"), os.path.join(modules, "steamworks.js"))
-
-    cfg = patcher.load_config()
-    cfg["modernRuntime"] = True
-    work = tempfile.mkdtemp(prefix="idleontune_")
+    staging = dest + ".new"
+    if os.path.isdir(staging):
+        shutil.rmtree(staging)
     try:
-        asarlib.extract(src_asar, work)
-        for name, ok, note in patches.apply_all(work, cfg, patcher.VERSION):
-            print(("  ok   " if ok else "  SKIP ") + name + (" - " + note if note else ""))
-        asarlib.pack(work, os.path.join(dest, "resources", "app.asar"))
+        step(4, "Laying out the new engine")
+        os.makedirs(staging)
+        with zipfile.ZipFile(io.BytesIO(electron)) as z:
+            z.extractall(staging)
+        os.remove(os.path.join(staging, "resources", "default_app.asar"))
+        os.replace(os.path.join(staging, "electron.exe"), os.path.join(staging, "LegendsOfIdleon.exe"))
+        with open(os.path.join(staging, "steam_appid.txt"), "w") as fh:
+            fh.write(APP_ID)
+        modules = os.path.join(staging, "resources", "app.asar.unpacked", "node_modules")
+        os.makedirs(modules)
+        with tarfile.open(fileobj=io.BytesIO(steamworks)) as t:
+            t.extractall(modules, filter="data")
+        os.rename(os.path.join(modules, "package"), os.path.join(modules, "steamworks.js"))
+
+        step(5, "Patching the game code")
+        cfg = patcher.load_config()
+        cfg["modernRuntime"] = True
+        work = tempfile.mkdtemp(prefix="idleontune_")
+        try:
+            print("      unpacking app.asar")
+            asarlib.extract(src_asar, work)
+            results = patches.apply_all(work, cfg, patcher.VERSION)
+            for name, ok, note in results:
+                print(("      ok    " if ok else "      skip  ") + name + (" - " + note if note else ""))
+            broken = [name for name, ok, _ in results if not ok and name in REQUIRED]
+            if broken:
+                raise SystemExit(
+                    "\nThis game version changed code the Electron 44 copy needs (%s).\n"
+                    "Nothing was replaced; your previous copy still works. Check for a newer IdleOn Tune."
+                    % ", ".join(broken))
+            print("      packing app.asar")
+            asarlib.pack(work, os.path.join(staging, "resources", "app.asar"))
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+
+        step(6, "Installing")
+        if os.path.isdir(dest):
+            shutil.rmtree(dest)
+        os.replace(staging, dest)
+        print("      " + dest)
     finally:
-        shutil.rmtree(work, ignore_errors=True)
+        if os.path.isdir(staging):
+            shutil.rmtree(staging, ignore_errors=True)
+
+    step(7, "Profile and shortcut")
     copy_profile()
     if make_shortcut:
         shortcut(dest, game)
-    print("Built IdleOn Tune %s on Electron %s in %s" % (patcher.VERSION, ELECTRON_VERSION, dest))
-    print("To start it from Steam (overlay, playtime), set the game's launch options to:")
+    print("\nDone: IdleOn Tune %s on Electron %s." % (patcher.VERSION, ELECTRON_VERSION))
+    print("Play from the IdleOn (Tune) desktop shortcut.")
+    print("To start it from Steam instead (overlay, playtime), set the game's launch options to:")
     print('    "%s" %%command%%' % os.path.join(os.path.abspath(dest), "LegendsOfIdleon.exe"))
 
 
