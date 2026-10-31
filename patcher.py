@@ -52,9 +52,31 @@ def load_state(p):
 CONFIG_PATH = os.path.join(HERE, "config.json")
 
 
+def env_value(raw, default):
+    """Parses an IT_<key> setting from IdleOnTune.bat into the type of the default."""
+    raw = raw.strip()
+    if isinstance(default, bool):
+        return raw.lower() in ("1", "true", "yes", "on")
+    if isinstance(default, (int, float)) and raw.lower() != "auto":
+        try:
+            return int(raw)
+        except ValueError:
+            return float(raw)
+    if isinstance(default, list):
+        return [x.strip() for x in raw.split(",") if x.strip()]
+    return raw
+
+
 def load_config():
+    """config.json holds the defaults; IdleOnTune.bat overrides them with
+    IT_<key> environment variables."""
     with open(CONFIG_PATH, encoding="utf-8") as fh:
-        return json.load(fh)
+        cfg = json.load(fh)
+    for key, default in list(cfg.items()):
+        raw = os.environ.get("IT_" + key)
+        if raw is not None and raw.strip() != "":
+            cfg[key] = env_value(raw, default)
+    return cfg
 
 
 def is_modded(asar_path):

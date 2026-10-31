@@ -20,49 +20,56 @@ Same account, same map (W2 pirates), AUTO on, RTX 3060 Ti, 1920×1080 at 300 Hz:
 
 Fullscreen is sharp instead of blurry: the game is drawn at screen resolution instead of being stretched from 960×540.
 
-## Two ways to use it
+## Install
 
-You need [Python 3](https://www.python.org/downloads/) on Windows. Close the game first.
+1. Download the release zip and unzip it anywhere.
+2. Close the game.
+3. Run **`IdleOnTune.bat`** and press **1**.
 
-### 1. Patch the Steam game (stable)
+That is all. It builds a fast copy of the game on Electron 44 and puts an **IdleOn (Tune)** shortcut on the desktop; play from that shortcut. The Steam installation is not modified. Python 3 is needed; if it is missing, the batch file offers to install it with winget.
 
-- `install.bat` installs (run it again after editing `config.json`).
-- `restore.bat` puts the original back.
-- `python patcher.py status` shows the current state.
+**Settings** are at the top of `IdleOnTune.bat`, each with a short description. Edit, save, run it again and press 1.
 
-The original archive is kept as `resources\app.asar.vanilla`, and every install starts from it. A Steam update replaces the archive and removes the mod; run `install.bat` again and the update is picked up automatically. If the game is not in the default Steam folder:
+**After a game update** in Steam, run `IdleOnTune.bat` again and press 1.
+
+The menu also has:
+
+- **2** patch the Steam game in place instead (stock Electron 11, slower; the original archive is kept as `resources\app.asar.vanilla`);
+- **3** uninstall everything (removes the copy and the shortcut, restores the Steam game);
+- **4** status.
+
+If the game is not in the default Steam folder, run it from a command prompt with `--game`:
 
 ```
-install.bat --game "D:\SteamLibrary\steamapps\common\Legends of Idleon"
+IdleOnTune.bat --game "D:\SteamLibrary\steamapps\common\Legends of Idleon"
 ```
 
-### 2. Run the game on Electron 44 (experimental, much faster)
-
-`build-electron44.bat` builds a separate copy of the game on a current Electron and puts an **IdleOn (Tune)** shortcut on the desktop. The Steam installation is not modified.
+### About the Electron 44 copy
 
 - Electron 44.8.0 comes from the official GitHub release; its SHA-256 is checked against the release's `SHASUMS256.txt`.
 - [steamworks.js](https://github.com/ceifa/steamworks.js) 0.4.0 comes from npm and is checked against its integrity hash. It replaces the game's old `greenworks` Steam module: Steam sign-in, rich presence, achievements, Steam purchases, Steam Deck keyboard.
 - The copy is built in `%LOCALAPPDATA%\IdleOnTune\runtime` and uses its own browser profile, `legends-of-idleon-modern`. A newer Chromium upgrades a profile in place, so the stock game must not share one.
 - On the first build, the stock game's profile is copied over so you stay signed in with the same account.
-- Run `build-electron44.bat` again after a game update. Remove the copy with `python runtime.py remove`.
 
 **About signing in:** "Sign in with Steam" logs into the account `steam_<SteamID>`. If your account is a Google or e-mail one, that is a *different, empty* account. Use the copied profile, or sign in the same way you normally do.
 
 Do not run the stock game and the Electron 44 copy at the same time on one account.
 
-**Steam overlay and playtime:** the Steam overlay is only injected into processes Steam starts itself, so the desktop shortcut gets no overlay. To launch the Electron 44 copy from Steam instead, set the game's launch options (Steam → Legends of Idleon → Properties → Launch Options) to:
+**Steam overlay and playtime:** the Steam overlay is only injected into processes Steam starts itself, so the desktop shortcut gets no overlay. To launch the copy from Steam instead, set the game's launch options (Steam → Legends of Idleon → Properties → Launch Options) to:
 
 ```
 "C:\Users\<you>\AppData\Local\IdleOnTune\runtime\LegendsOfIdleon.exe" %command%
 ```
 
-`build-electron44.bat` prints this line with your real path at the end. The copy ignores the extra argument Steam appends (tested).
+Option 1 prints this line with your real path at the end. The copy ignores the extra argument Steam appends (tested).
 
 ## What the patches do
 
 | Patch (`config.json` key) | What and why |
 |---|---|
-| FPS cap (`fpsLimit`, default 60) | The game asks for 65 FPS, but Lime treats 60 and above as uncapped, so the game redraws at the monitor's refresh rate. Stencyl runs game logic in fixed 10 ms steps of real time, so the cap only changes how often the same state is redrawn. `0` keeps the stock behaviour; `100` matches the logic rate. |
+| FPS cap (`fpsLimit`, default 100) | The game asks for 65 FPS, but Lime treats 60 and above as uncapped, so the game redraws at the monitor's refresh rate. Stencyl runs game logic in fixed 10 ms steps of real time, so the cap only changes how often the same state is redrawn. 100 matches the logic rate: every frame shows exactly one logic step. `0` keeps the stock behaviour. |
+| Frame pacing (`framePacing`, default `vsync`) | Draws on every N-th monitor refresh (N from the measured refresh rate and the cap) instead of Lime's time grid, so frame intervals are even. Demo scene, 100 FPS cap on a 300 Hz monitor: frames at exactly 10 ms went from 69 % to 93 %, 6.7 ms jumps from 22 % to 0.7 %. |
+| JavaScript young generation (`v8SemiSpaceMB`, default 64) | `--max-semi-space-size` for V8: fewer minor garbage collections in a game that creates short-lived objects every frame. |
 | Animation filter cache (`filterCache`) | Stencyl colour-filters animation frames on the CPU (`getImageData` plus a per-pixel loop) and keeps the result per animation instance, dropping it on every animation switch. A shared cache keyed by source frame and colour matrix removes the repeated work. On a real account this took `applyFilters` from about 4 % of frame time to nothing. |
 | WebGL renderer (`renderer`: `"canvas"` default, or `"webgl"`, experimental) | The game was built with OpenFL's `canvas` define, which cut the WebGL branch out of `Stage.__createRenderer`, but OpenFL 9.2.0's `OpenGLRenderer`, `Context3D` and all `Context3D*` renderers are still in N.js. This puts the branch back as in OpenFL's source. OpenGLRenderer also smooths every texture whenever the stage is scaled, which blurred the pixel art at high-DPI scale; that is turned off so sprites stay as sharp as on Canvas. Measured on a real account, uncapped: WebGL 118–120 FPS, median 7.1–7.7 ms, 215–220 % CPU; Canvas 102–119 FPS, median 8.2–8.7 ms, better 99th percentile, 153 % CPU. Canvas stays the default. |
 | WebGL uniform cache (`glUniformCache`, WebGL only) | OpenFL re-sends every shader parameter before every object. Uniforms keep their value until set, so identical re-sends are skipped. Not measured yet. |
@@ -76,9 +83,9 @@ Do not run the stock game and the Electron 44 copy at the same time on one accou
 | Broken assets (`fixBrokenAssets`) | The CSS points at `/static/...`, which resolves to `C:\static\...` under `file://`, so the custom cursor and the sign-in fonts never load. |
 | No analytics (`disableAnalytics`, off by default) | Skips loading Google Analytics, which the game initialises but never sends events to. Tested: the Google Tag Manager request is gone and sign-in is restored exactly as without it. |
 | Steam overlay (`steamOverlayFix`) | The game's own flags for the Steam overlay (`--in-process-gpu`). |
-| `extraChromiumFlags` | Extra Chromium switches, for example `["ignore-gpu-blocklist"]`. |
+| Extra flags (`extraChromiumFlags`) | Extra Chromium switches, for example `["ignore-gpu-blocklist"]`. |
 
-Each patch is tied to an exact piece of the shipped code. If a game update changes that code, the installer skips the patch and says so instead of guessing.
+Each setting's key is the `IT_<key>` line in `IdleOnTune.bat` (defaults live in `config.json`). Each patch is tied to an exact piece of the shipped code. If a game update changes that code, the installer skips the patch and says so instead of guessing.
 
 ## What was tested
 
@@ -95,7 +102,7 @@ Each patch is tied to an exact piece of the shipped code. If a game update chang
 
 ## How it works
 
-`asarlib.py` reads and writes Electron `.asar` archives. `patches.py` holds the text patches. `patcher.py` installs them into the Steam game. `runtime.py` builds the Electron 44 copy. The `mod/` folder has the code injected into the game page and the main process, plus the `greenworks` shim.
+`IdleOnTune.bat` holds the settings and the menu. `asarlib.py` reads and writes Electron `.asar` archives. `patches.py` holds the text patches. `patcher.py` installs them into the Steam game. `runtime.py` builds the Electron 44 copy. The `mod/` folder has the code injected into the game page and the main process, plus the `greenworks` shim.
 
 ## License
 

@@ -133,7 +133,7 @@ def build(game, dest, make_shortcut=True):
         sys.exit("Game not found in " + game)
     vanilla = src_asar + ".vanilla"
     if os.path.exists(vanilla):
-        src_asar = vanilla  # the Steam copy is modded by install.bat; start from the original
+        src_asar = vanilla  # the Steam copy is modded (menu option 2); start from the original
     elif patcher.is_modded(src_asar):
         sys.exit("The Steam game is modded but has no backup; verify the game files in Steam first.")
     if running(dest):

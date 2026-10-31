@@ -4,7 +4,8 @@
   "sharpRendering": true,
   "renderScale": "auto",
   "maxRenderScale": 3,
-  "fpsLimit": 60,
+  "fpsLimit": 100,
+  "framePacing": "vsync",
   "skipHiddenRendering": true,
   "filterCache": true,
   "fpsOverlayHotkey": true,
@@ -14,5 +15,6 @@
   "fixBrokenAssets": true,
   "disableAnalytics": false,
   "steamOverlayFix": true,
+  "v8SemiSpaceMB": 64,
   "extraChromiumFlags": []
 }

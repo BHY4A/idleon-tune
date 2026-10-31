@@ -15,16 +15,65 @@
     window.__itScale = Math.max(1, Math.min(cfg.maxRenderScale, Number(scale) || 1));
   }
 
-  if (cfg.fpsLimit > 0) window.__itFps = cfg.fpsLimit;
+  // Frame cap. "vsync" pacing leaves Lime uncapped and draws on every N-th
+  // monitor refresh instead (see __itRaf), so frame intervals are even;
+  // "timer" pacing is Lime's own time-grid cap (p_fps_limit).
+  var vsyncPacing = cfg.fpsLimit > 0 && cfg.framePacing === "vsync";
+  if (cfg.fpsLimit > 0 && !vsyncPacing) window.__itFps = cfg.fpsLimit;
+
+  // Monitor refresh interval, estimated from back-to-back animation frames.
+  // Slow frames skip refreshes and produce 2x/3x gaps, so the true period is
+  // the short end of the distribution, not the median.
+  var vsync = 1000 / 60, deltas = [];
+  var noteDelta = function (d) {
+    if (d <= 0 || d > 100) return;
+    deltas.push(d);
+    if (deltas.length > 240) deltas.shift();
+    if (deltas.length >= 30) {
+      var s = deltas.slice().sort(function (a, b) { return a - b; });
+      vsync = s[Math.floor(s.length * 0.1)];
+    }
+  };
+
+  // Intervals between game frames, for measuring smoothness (last 600).
+  var frameTimes = window.__itFrameIntervals = [];
+  var lastFrameAt = 0;
+  var markFrame = window.__itMarkFrame = function (t) {
+    t = t || performance.now();
+    if (lastFrameAt) {
+      frameTimes.push(t - lastFrameAt);
+      if (frameTimes.length > 600) frameTimes.shift();
+    }
+    lastFrameAt = t;
+  };
 
   // Game loop scheduler: animation frames normally, a timer while the page is
   // hidden (hidden pages get no animation frames and the game would freeze).
   var hiddenStep = 1000 / (cfg.fpsLimit > 0 ? cfg.fpsLimit : 60);
+  var lastDraw = 0, prevStep = 0;
   window.__itRaf = function (cb) {
     if (document.hidden) {
       return setTimeout(function () { cb(performance.now()); }, hiddenStep);
     }
-    return window.requestAnimationFrame(cb);
+    if (!vsyncPacing) {
+      return window.requestAnimationFrame(cb);
+    }
+    var step = function (t) {
+      // Every animation frame counts, drawn or not; the median ignores the
+      // longer gaps after slow frames.
+      if (prevStep) noteDelta(t - prevStep);
+      prevStep = t;
+      var n = Math.max(1, Math.round(1000 / vsync / cfg.fpsLimit));
+      // Draw once n refreshes have passed; half a refresh of slack absorbs timer
+      // jitter, and an overrun simply draws on the next refresh.
+      if (t - lastDraw >= (n - 0.5) * vsync) {
+        lastDraw = t;
+        cb(t);
+      } else {
+        window.requestAnimationFrame(step);
+      }
+    };
+    return window.requestAnimationFrame(step);
   };
 
   // Shared cache for colour-filtered animation frames (see p_filter_cache).

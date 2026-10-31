@@ -37,6 +37,11 @@ function applySwitches(app) {
   for (const flag of config.extraChromiumFlags || []) {
     app.commandLine.appendSwitch(flag);
   }
+  // A larger young generation means fewer minor garbage collections; the game
+  // churns through short-lived objects (damage numbers, drops) every frame.
+  if (config.v8SemiSpaceMB > 0) {
+    app.commandLine.appendSwitch("js-flags", `--max-semi-space-size=${config.v8SemiSpaceMB}`);
+  }
 }
 
 // Size/position for the BrowserWindow constructor.

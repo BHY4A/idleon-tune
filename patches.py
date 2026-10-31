@@ -164,7 +164,7 @@ def p_frame_counter(f, cfg, version):
         raise Skip("disabled in config")
     f.set(N_JS, replace(f.get(N_JS),
         '__onLimeRender:function(e){if(!this.__rendering){',
-        '__onLimeRender:function(e){if(!this.__rendering){window.__itFrames=(window.__itFrames||0)+1;'))
+        '__onLimeRender:function(e){if(!this.__rendering){window.__itFrames=(window.__itFrames||0)+1,window.__itMarkFrame&&window.__itMarkFrame();'))
 
 
 def p_no_analytics(f, cfg, version):
