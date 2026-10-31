@@ -105,16 +105,25 @@ def copy_profile():
     print("Copied the stock game profile (sign-in) to " + MODERN_PROFILE)
 
 
+def desktop_dir():
+    # The Desktop may be redirected (OneDrive), so ask Windows for it.
+    out = subprocess.run(["powershell", "-NoProfile", "-Command",
+                          "[Console]::OutputEncoding=[Text.Encoding]::UTF8;[Environment]::GetFolderPath('Desktop')"],
+                         capture_output=True, text=True, encoding="utf-8").stdout.strip()
+    return out if os.path.isdir(out) else None
+
+
 def shortcut(dest, game):
-    desktop = os.path.join(os.environ.get("USERPROFILE", ""), "Desktop")
-    if not os.path.isdir(desktop):
+    desktop = desktop_dir()
+    if not desktop:
         return
     link = os.path.join(desktop, "IdleOn (Tune).lnk")
     exe = os.path.join(dest, "LegendsOfIdleon.exe")
     icon = os.path.join(game, "LegendsOfIdleon.exe")
-    ps = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{0}');$s.TargetPath='{1}';"
-          "$s.WorkingDirectory='{2}';$s.IconLocation='{3},0';$s.Save()").format(link, exe, dest, icon)
-    subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=False)
+    ps = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($env:IT_LINK);$s.TargetPath=$env:IT_EXE;"
+          "$s.WorkingDirectory=$env:IT_DEST;$s.IconLocation=$env:IT_ICON+',0';$s.Save()")
+    env = dict(os.environ, IT_LINK=link, IT_EXE=exe, IT_DEST=dest, IT_ICON=icon)
+    subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=False, env=env)
     print("Desktop shortcut: " + link)
 
 
@@ -165,8 +174,9 @@ def build(game, dest):
 def remove(dest):
     if os.path.isdir(dest):
         shutil.rmtree(dest)
-    link = os.path.join(os.environ.get("USERPROFILE", ""), "Desktop", "IdleOn (Tune).lnk")
-    if os.path.exists(link):
+    desktop = desktop_dir()
+    link = os.path.join(desktop, "IdleOn (Tune).lnk") if desktop else None
+    if link and os.path.exists(link):
         os.remove(link)
     print("Removed " + dest + " (the copied profile stays in " + MODERN_PROFILE + ")")
 
