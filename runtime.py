@@ -127,7 +127,7 @@ def shortcut(dest, game):
     print("Desktop shortcut: " + link)
 
 
-def build(game, dest):
+def build(game, dest, make_shortcut=True):
     src_asar = os.path.join(game, "resources", "app.asar")
     if not os.path.exists(src_asar):
         sys.exit("Game not found in " + game)
@@ -167,8 +167,11 @@ def build(game, dest):
     finally:
         shutil.rmtree(work, ignore_errors=True)
     copy_profile()
-    shortcut(dest, game)
+    if make_shortcut:
+        shortcut(dest, game)
     print("Built IdleOn Tune %s on Electron %s in %s" % (patcher.VERSION, ELECTRON_VERSION, dest))
+    print("To start it from Steam (overlay, playtime), set the game's launch options to:")
+    print('    "%s" %%command%%' % os.path.join(os.path.abspath(dest), "LegendsOfIdleon.exe"))
 
 
 def remove(dest):
@@ -186,9 +189,13 @@ def main():
     ap.add_argument("command", choices=["build", "remove"])
     ap.add_argument("--game", default=patcher.DEFAULT_GAME)
     ap.add_argument("--dest", default=DEFAULT_DEST)
+    ap.add_argument("--config", help="alternative config.json")
+    ap.add_argument("--no-shortcut", action="store_true")
     args = ap.parse_args()
+    if args.config:
+        patcher.CONFIG_PATH = args.config
     if args.command == "build":
-        build(args.game, args.dest)
+        build(args.game, args.dest, not args.no_shortcut)
     else:
         remove(args.dest)
 

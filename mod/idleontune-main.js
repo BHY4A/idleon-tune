@@ -113,6 +113,19 @@ function attach(window) {
     }
   }
 
+  // Fullscreen hides the 32 px title bar so the game fills the screen (CSS in main.css).
+  if (config.fullscreenHotkey) {
+    const syncTitleBar = () => {
+      if (window.isDestroyed()) return;
+      window.webContents
+        .executeJavaScript(`document.documentElement.classList.toggle("it-fs", ${window.isFullScreen()})`)
+        .catch(() => {});
+    };
+    window.on("enter-full-screen", syncTitleBar);
+    window.on("leave-full-screen", syncTitleBar);
+    window.webContents.on("did-finish-load", syncTitleBar);
+  }
+
   window.webContents.on("before-input-event", (event, input) => {
     if (input.type !== "keyDown") return;
     const fullscreenKey = input.key === "F11" || (input.alt && input.key === "Enter");

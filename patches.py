@@ -126,6 +126,12 @@ def p_filter_cache(f, cfg, version):
         'null!=K&&window.__itFilterStore(s,K,e);return e}'))
 
 
+def p_engine_handle(f, cfg, version):
+    """window.__itEngine = the Stencyl engine (for the F3 overlay and tests)."""
+    f.set(N_JS, replace(f.get(N_JS), 'addTask:function(e){this.tasks.push(e)}',
+                        'addTask:function(e){window.__itEngine=this,this.tasks.push(e)}'))
+
+
 def p_task_list(f, cfg, version):
     """Engine timers (runLater/runPeriodically) run 100 times a second; each
     finished one was removed with indexOf+splice, quadratic with hundreds of
@@ -143,8 +149,8 @@ def p_task_list(f, cfg, version):
         '(t=__itL[n]).__itRm||t.done||t.update(a.STEP_SIZE),t.done||t.__itRm||(__itL[__itW++]=t)}'
         'finally{if(__itL===this.tasks){for(;n<__itL.length;)__itL[__itW++]=__itL[n++];__itL.length=__itW}this.__itIter=!1}')
     text = replace(text,
-        'addTask:function(e){this.tasks.push(e)},removeTask:function(e){ba.remove(this.tasks,e)}',
-        'addTask:function(e){e.__itRm=!1,this.tasks.push(e)},removeTask:function(e){this.__itIter?e.__itRm=!0:ba.remove(this.tasks,e)}')
+        'addTask:function(e){window.__itEngine=this,this.tasks.push(e)},removeTask:function(e){ba.remove(this.tasks,e)}',
+        'addTask:function(e){window.__itEngine=this,e.__itRm=!1,this.tasks.push(e)},removeTask:function(e){this.__itIter?e.__itRm=!0:ba.remove(this.tasks,e)}')
     f.set(N_JS, text)
 
 
@@ -188,6 +194,10 @@ def p_main_process(f, cfg, version):
     text = replace(text, '  } catch (e) {\n    app.quit();\n  }',
                    '  } catch (e) {\n    console.error("Startup error:", e);\n    app.quit();\n  }', 2)
     f.set(MAIN, text)
+    # In fullscreen the 32 px title bar is hidden so the game fills the screen.
+    if cfg["fullscreenHotkey"]:
+        css = "distBuild/main.css"
+        f.set(css, f.get(css) + "\nhtml.it-fs #menuBar{display:none}html.it-fs .container{height:100vh}\n")
 
 
 def p_modern_runtime(f, cfg, version):
@@ -253,6 +263,7 @@ PATCHES = [
     ("FPS limit", p_fps_limit),
     ("game loop while hidden", p_hidden_loop),
     ("shared animation filter cache", p_filter_cache),
+    ("engine handle", p_engine_handle),
     ("engine timer list", p_task_list),
     ("F3 FPS counter", p_frame_counter),
     ("disable analytics", p_no_analytics),

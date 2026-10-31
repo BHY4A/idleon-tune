@@ -50,6 +50,14 @@ install.bat --game "D:\SteamLibrary\steamapps\common\Legends of Idleon"
 
 Do not run the stock game and the Electron 44 copy at the same time on one account.
 
+**Steam overlay and playtime:** the Steam overlay is only injected into processes Steam starts itself, so the desktop shortcut gets no overlay. To launch the Electron 44 copy from Steam instead, set the game's launch options (Steam → Legends of Idleon → Properties → Launch Options) to:
+
+```
+"C:\Users\<you>\AppData\Local\IdleOnTune\runtime\LegendsOfIdleon.exe" %command%
+```
+
+`build-electron44.bat` prints this line with your real path at the end. The copy ignores the extra argument Steam appends (tested).
+
 ## What the patches do
 
 | Patch (`config.json` key) | What and why |
@@ -59,13 +67,13 @@ Do not run the stock game and the Electron 44 copy at the same time on one accou
 | Sharp fullscreen (`sharpRendering`, `renderScale`, `maxRenderScale`) | Turns on Lime's high-DPI mode with a scale that matches the screen. Mouse coordinates are unaffected. |
 | Skip drawing while minimized (`skipHiddenRendering`) | A minimized game keeps playing (combat, AFK) but stops drawing. Idle time of the render process went from 17 % to 60 %. |
 | Game loop while hidden | A hidden page gets no animation frames. Stock Electron 11 works around this with `incrementCapturerCount`, which current Electron removed. While hidden, the loop runs on a timer instead. |
-| F3 (`fpsOverlayHotkey`) | Shows the frames the game actually draws, not browser repaints. |
-| F11 / Alt+Enter (`fullscreenHotkey`) | Fullscreen. |
+| F3 (`fpsOverlayHotkey`) | Shows the frames the game actually draws (not browser repaints), the number of engine timers and the JS heap size. |
+| F11 / Alt+Enter (`fullscreenHotkey`) | Fullscreen. The game's 32 px title bar is hidden in fullscreen, so the game fills the whole screen instead of being letterboxed. |
 | F12 (`screenshotHotkey`) | Full-resolution screenshot to `Pictures\IdleOn`. |
 | Remember window (`rememberWindow`) | Size, position, maximized and fullscreen state. |
 | Broken assets (`fixBrokenAssets`) | The CSS points at `/static/...`, which resolves to `C:\static\...` under `file://`, so the custom cursor and the sign-in fonts never load. |
-| No analytics (`disableAnalytics`, off by default) | Skips loading Google Analytics, which the game initialises but never sends events to. Sign-in has not been tested with this option. |
-| Engine timer list (`engineTaskFix`, **off**) | Removes finished engine timers in one pass instead of `indexOf` + `splice`. The first version broke damage numbers and drops. It has been rewritten to survive exceptions and scene switches, but is not tested yet. |
+| No analytics (`disableAnalytics`, off by default) | Skips loading Google Analytics, which the game initialises but never sends events to. Tested: the Google Tag Manager request is gone and sign-in is restored exactly as without it. |
+| Engine timer list (`engineTaskFix`, **off**) | Removes finished engine timers in one pass instead of `indexOf` + `splice` (about 2 % of frame time). The first version broke damage numbers and drops after signing in: the scene switch after sign-in runs from a timer and replaces the timer list, and the old timers were copied into the new scene. The current version leaves a replaced list alone. Synthetic tests (hundreds of timers, removal and addition during the pass, list replacement mid-pass) behave the same as the stock loop, and a demo-scene fight works. It stays off until it has been played on a real account. |
 | Steam overlay (`steamOverlayFix`) | The game's own flags for the Steam overlay (`--in-process-gpu`). |
 | `extraChromiumFlags` | Extra Chromium switches, for example `["ignore-gpu-blocklist"]`. |
 
@@ -75,7 +83,8 @@ Each patch is tied to an exact piece of the shipped code. If a game update chang
 
 - On the Steam game and on the Electron 44 copy, with a real account: FPS, frame times and CPU in combat, sign-in, fullscreen screenshots.
 - On a copy of the game without signing in: each patch on its own, F11/Alt+Enter/F12, window memory, minimize and restore.
-- Not tested: Steam overlay, Steam purchases on Electron 44, `disableAnalytics`, `engineTaskFix`.
+- Electron 44 copy: launched with Steam's extra launch argument, fullscreen without title bar, `disableAnalytics`, `engineTaskFix` synthetic tests.
+- Not tested: the Steam overlay itself (needs the launch option above, then Shift+Tab), Steam purchases on Electron 44 (needs a real purchase; the purchase callback is registered the same way, but a real purchase has not been made), `engineTaskFix` on a real account.
 
 ## How it works
 

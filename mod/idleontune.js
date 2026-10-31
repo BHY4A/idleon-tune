@@ -78,8 +78,11 @@
       var fps = Math.round((frames - lastFrames) * 1000 / (now - lastAt));
       lastFrames = frames;
       lastAt = now;
+      var engine = window.__itEngine, mem = performance.memory;
       fpsEl.textContent = window.__itHidden ? "FPS: paused (minimized)" :
-        "FPS " + fps + " · render x" + (window.__itScale || 1).toFixed(2);
+        "FPS " + fps + " · render x" + (window.__itScale || 1).toFixed(2) +
+        (engine ? " · timers " + engine.tasks.length : "") +
+        (mem ? " · heap " + Math.round(mem.usedJSHeapSize / 1048576) + " MB" : "");
     };
     window.addEventListener("keydown", function (e) {
       if (e.key !== "F3") return;
