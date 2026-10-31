@@ -34,7 +34,7 @@ import asarlib
 import patcher
 import patches
 
-ELECTRON_VERSION = "44.8.0"
+ELECTRON_VERSION = "44.10.1"  # default; IT_electronVersion in IdleOnTune.bat overrides it
 STEAMWORKS_VERSION = "0.4.0"
 APP_ID = "1476970"
 
@@ -86,9 +86,9 @@ def cached(name, url):
         return fh.read()
 
 
-def get_electron():
-    base = "https://github.com/electron/electron/releases/download/v%s/" % ELECTRON_VERSION
-    name = "electron-v%s-win32-x64.zip" % ELECTRON_VERSION
+def get_electron(version):
+    base = "https://github.com/electron/electron/releases/download/v%s/" % version
+    name = "electron-v%s-win32-x64.zip" % version
     data = cached(name, base + name)
     sums = fetch(base + "SHASUMS256.txt").decode()
     expected = next((line.split()[0] for line in sums.splitlines() if line.endswith(name)), None)
@@ -174,8 +174,9 @@ def build(game, dest, make_shortcut=True):
         sys.exit("Close the game first.")
     print("      game files: " + src_asar)
 
-    step(2, "Electron %s (github.com/electron/electron)" % ELECTRON_VERSION)
-    electron = get_electron()
+    version = os.environ.get("IT_electronVersion", "").strip() or ELECTRON_VERSION
+    step(2, "Electron %s (github.com/electron/electron)" % version)
+    electron = get_electron(version)
     step(3, "steamworks.js %s (npmjs.com/package/steamworks.js)" % STEAMWORKS_VERSION)
     steamworks = get_steamworks()
 
@@ -231,7 +232,7 @@ def build(game, dest, make_shortcut=True):
     copy_profile()
     if make_shortcut:
         shortcut(dest, game)
-    print("\nDone: IdleOn Tune %s on Electron %s." % (patcher.VERSION, ELECTRON_VERSION))
+    print("\nDone: IdleOn Tune %s on Electron %s." % (patcher.VERSION, version))
     print("Play from the IdleOn (Tune) desktop shortcut.")
     print("To start it from Steam instead (overlay, playtime), set the game's launch options to:")
     print('    "%s" %%command%%' % os.path.join(os.path.abspath(dest), "LegendsOfIdleon.exe"))

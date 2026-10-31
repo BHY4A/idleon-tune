@@ -9,6 +9,13 @@ rem  Edit the settings below, save, and run this file again to apply them.
 rem  Close the game before running it.
 rem ===========================================================================
 
+rem ---- Engine ---------------------------------------------------------------
+
+rem Electron version for the fast copy (option 1). Any release from
+rem github.com/electron/electron/releases works; the download is checked
+rem against that release's official SHA-256 list. See README for the choice.
+set IT_electronVersion=44.10.1
+
 rem ---- Performance ----------------------------------------------------------
 
 rem Frame cap. 100 matches the game's logic rate (it runs 100 steps a second),

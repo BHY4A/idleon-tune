@@ -49,7 +49,7 @@ IdleOnTune.bat --game "D:\SteamLibrary\steamapps\common\Legends of Idleon"
 Option 1 shows each step as it runs:
 
 1. **Checks the game**: takes the game's current `app.asar` from your Steam folder (or the untouched `app.asar.vanilla` if option 2 patched the Steam game).
-2. **Downloads [Electron](https://www.electronjs.org/) 44.8.0** from the [official GitHub release](https://github.com/electron/electron/releases/tag/v44.8.0) and checks its SHA-256 against the release's `SHASUMS256.txt`.
+2. **Downloads [Electron](https://www.electronjs.org/)** (version from `IT_electronVersion`, default 44.10.1) from its [official GitHub release](https://github.com/electron/electron/releases) and checks its SHA-256 against that release's `SHASUMS256.txt`.
 3. **Downloads [steamworks.js](https://github.com/ceifa/steamworks.js) 0.4.0** from [npm](https://www.npmjs.com/package/steamworks.js) and checks it against npm's integrity hash. It replaces the game's old `greenworks` Steam module: Steam sign-in, rich presence, achievements, Steam purchases, Steam Deck keyboard.
 4. **Lays out the new engine** in a temporary folder.
 5. **Patches the game code**: unpacks `app.asar`, applies the patches (including the changes the game needs on a current Electron) and packs it again.
@@ -57,6 +57,18 @@ Option 1 shows each step as it runs:
 7. **Profile and shortcut**: on the first build copies the stock game's browser profile so you stay signed in, and creates the desktop shortcut.
 
 Downloads are cached in `%LOCALAPPDATA%\IdleOnTune\downloads`, so later builds take seconds.
+
+**Which Electron version, and why.** Electron has no LTS releases: a new major version ships every 8 weeks and the latest three get security and bug fixes. The default is **44.10.1**:
+
+| | 44.8.0 | 44.10.1 | 45.2.1 |
+|---|---|---|---|
+| Chromium | 152.0.7977.167 | 152.0.7977.169 | 156.0.8078.75 |
+| Starts, Steam, sign-in restored | yes | yes | yes |
+| FPS (100 cap, demo scene, two runs each) | 95–99 | 94–98 | 94–96 |
+| Frames at exactly 10 ms | 95–96 % | 89–96 % | 90–95 % |
+| CPU, all processes | 160–168 % | 170–178 % | 163–178 % |
+
+Performance is the same within run-to-run noise. 44.10.1 and 45.2.1 carry security fixes backported from Chromium, V8, Skia and ANGLE that 44.8.0 does not have, which matters because the game loads Firebase scripts from the internet. 44.10.1 is on the branch everything was tested on with a real account; 45.x has the longest support ahead but is in its first weeks as a major version. Electron 45's changes to sandboxed preload scripts do not affect the game (tested). To use another release, change `IT_electronVersion`.
 
 **Game updates:** the game's own code comes from your Steam installation every time, so after a Steam update you just run option 1 again. If an update changes code the Electron 44 copy cannot run without, step 5 stops with a message and your previous copy stays as it was. Optional patches whose code moved are skipped and listed.
 
