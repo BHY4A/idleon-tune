@@ -101,6 +101,32 @@ def p_fps_limit(f, cfg, version):
     f.set(N_JS, text)
 
 
+def p_webgl_renderer(f, cfg, version):
+    """The game was built with OpenFL's `canvas` define: Stage.__createRenderer
+    lost its WebGL branch, but OpenGLRenderer, Context3D and all Context3D*
+    renderers are still in N.js (Stencyl's shaders use them). This puts the
+    branch back exactly as in OpenFL 9.2.0 and asks Lime for a WebGL context."""
+    if cfg["renderer"] != "webgl":
+        raise Skip("renderer is " + cfg["renderer"])
+    text = f.get(N_JS)
+    text = replace(text,
+        'depth:!0,hardware:!0,stencil:!0,type:null,vsync:!0}',
+        'depth:!0,hardware:!0,stencil:!0,type:"webgl",vsync:!0}')
+    text = replace(text,
+        'switch(this.window.context.type){case"canvas":this.__renderer=new Vh(this.window.context.canvas2D);break;case"dom":',
+        'switch(this.window.context.type){case"opengl":case"opengles":case"webgl":'
+        'this.context3D=new A["openfl.display3D.Context3D"](this),'
+        'this.context3D.configureBackBuffer(this.stageWidth,this.stageHeight,0,!0,!0,!0),'
+        'this.context3D.present(),this.__renderer=new A["openfl.display.OpenGLRenderer"](this.context3D);break;'
+        'case"canvas":this.__renderer=new Vh(this.window.context.canvas2D);break;case"dom":')
+    # OpenGLRenderer smooths every texture whenever the stage is scaled
+    # (smoothing || __upscaled); at our high-DPI scale that blurred all pixel-art
+    # sprites. Smooth only what the game marks as smooth, like the Canvas renderer.
+    text = replace(text, 'this.__upscaled=1!=this.__worldTransform.a||1!=this.__worldTransform.d',
+                   'this.__upscaled=!1')
+    f.set(N_JS, text)
+
+
 def p_hidden_loop(f, cfg, version):
     """A hidden page gets no animation frames, which would stop the game loop.
     Stock Electron 11 avoids that with incrementCapturerCount (removed in newer
@@ -130,28 +156,6 @@ def p_engine_handle(f, cfg, version):
     """window.__itEngine = the Stencyl engine (for the F3 overlay and tests)."""
     f.set(N_JS, replace(f.get(N_JS), 'addTask:function(e){this.tasks.push(e)}',
                         'addTask:function(e){window.__itEngine=this,this.tasks.push(e)}'))
-
-
-def p_task_list(f, cfg, version):
-    """Engine timers (runLater/runPeriodically) run 100 times a second; each
-    finished one was removed with indexOf+splice, quadratic with hundreds of
-    damage-number timers. One compacting pass instead, same order and timing.
-    removeTask during the pass only marks the task so the pass can drop it."""
-    if not cfg["engineTaskFix"]:
-        raise Skip("disabled in config")
-    text = f.get(N_JS)
-    # Task callbacks run game code without try/catch and may switch scenes,
-    # which replaces this.tasks. The pass keeps its own array reference, stops
-    # if the list was replaced, and restores the unvisited tail on an exception.
-    text = replace(text,
-        'for(n=0;n<this.tasks.length;)(t=this.tasks[n]).done||t.update(a.STEP_SIZE),t.done&&(ba.remove(this.tasks,t),--n),++n;',
-        'var __itL=this.tasks,__itW=0;this.__itIter=!0;try{for(n=0;n<__itL.length&&__itL===this.tasks;++n)'
-        '(t=__itL[n]).__itRm||t.done||t.update(a.STEP_SIZE),t.done||t.__itRm||(__itL[__itW++]=t)}'
-        'finally{if(__itL===this.tasks){for(;n<__itL.length;)__itL[__itW++]=__itL[n++];__itL.length=__itW}this.__itIter=!1}')
-    text = replace(text,
-        'addTask:function(e){window.__itEngine=this,this.tasks.push(e)},removeTask:function(e){ba.remove(this.tasks,e)}',
-        'addTask:function(e){window.__itEngine=this,e.__itRm=!1,this.tasks.push(e)},removeTask:function(e){this.__itIter?e.__itRm=!0:ba.remove(this.tasks,e)}')
-    f.set(N_JS, text)
 
 
 def p_frame_counter(f, cfg, version):
@@ -259,12 +263,12 @@ def p_broken_assets(f, cfg, version):
 PATCHES = [
     ("renderer script", p_renderer_script),
     ("sharp fullscreen rendering", p_sharp_rendering),
+    ("WebGL renderer", p_webgl_renderer),
     ("skip drawing while minimized", p_skip_hidden_render),
     ("FPS limit", p_fps_limit),
     ("game loop while hidden", p_hidden_loop),
     ("shared animation filter cache", p_filter_cache),
     ("engine handle", p_engine_handle),
-    ("engine timer list", p_task_list),
     ("F3 FPS counter", p_frame_counter),
     ("disable analytics", p_no_analytics),
     ("window: fullscreen/screenshot/remember", p_main_process),

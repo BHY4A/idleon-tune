@@ -64,6 +64,8 @@ Do not run the stock game and the Electron 44 copy at the same time on one accou
 |---|---|
 | FPS cap (`fpsLimit`, default 60) | The game asks for 65 FPS, but Lime treats 60 and above as uncapped, so the game redraws at the monitor's refresh rate. Stencyl runs game logic in fixed 10 ms steps of real time, so the cap only changes how often the same state is redrawn. `0` keeps the stock behaviour; `100` matches the logic rate. |
 | Animation filter cache (`filterCache`) | Stencyl colour-filters animation frames on the CPU (`getImageData` plus a per-pixel loop) and keeps the result per animation instance, dropping it on every animation switch. A shared cache keyed by source frame and colour matrix removes the repeated work. On a real account this took `applyFilters` from about 4 % of frame time to nothing. |
+| WebGL renderer (`renderer`: `"canvas"` default, or `"webgl"`, experimental) | The game was built with OpenFL's `canvas` define, which cut the WebGL branch out of `Stage.__createRenderer`, but OpenFL 9.2.0's `OpenGLRenderer`, `Context3D` and all `Context3D*` renderers are still in N.js. This puts the branch back as in OpenFL's source. OpenGLRenderer also smooths every texture whenever the stage is scaled, which blurred the pixel art at high-DPI scale; that is turned off so sprites stay as sharp as on Canvas. Measured on a real account, uncapped: WebGL 118–120 FPS, median 7.1–7.7 ms, 215–220 % CPU; Canvas 102–119 FPS, median 8.2–8.7 ms, better 99th percentile, 153 % CPU. Canvas stays the default. |
+| WebGL uniform cache (`glUniformCache`, WebGL only) | OpenFL re-sends every shader parameter before every object. Uniforms keep their value until set, so identical re-sends are skipped. Not measured yet. |
 | Sharp fullscreen (`sharpRendering`, `renderScale`, `maxRenderScale`) | Turns on Lime's high-DPI mode with a scale that matches the screen. Mouse coordinates are unaffected. |
 | Skip drawing while minimized (`skipHiddenRendering`) | A minimized game keeps playing (combat, AFK) but stops drawing. Idle time of the render process went from 17 % to 60 %. |
 | Game loop while hidden | A hidden page gets no animation frames. Stock Electron 11 works around this with `incrementCapturerCount`, which current Electron removed. While hidden, the loop runs on a timer instead. |
@@ -73,7 +75,6 @@ Do not run the stock game and the Electron 44 copy at the same time on one accou
 | Remember window (`rememberWindow`) | Size, position, maximized and fullscreen state. |
 | Broken assets (`fixBrokenAssets`) | The CSS points at `/static/...`, which resolves to `C:\static\...` under `file://`, so the custom cursor and the sign-in fonts never load. |
 | No analytics (`disableAnalytics`, off by default) | Skips loading Google Analytics, which the game initialises but never sends events to. Tested: the Google Tag Manager request is gone and sign-in is restored exactly as without it. |
-| Engine timer list (`engineTaskFix`, **off**) | Removes finished engine timers in one pass instead of `indexOf` + `splice` (about 2 % of frame time). The first version broke damage numbers and drops after signing in: the scene switch after sign-in runs from a timer and replaces the timer list, and the old timers were copied into the new scene. The current version leaves a replaced list alone. Synthetic tests (hundreds of timers, removal and addition during the pass, list replacement mid-pass) behave the same as the stock loop, and a demo-scene fight works. It stays off until it has been played on a real account. |
 | Steam overlay (`steamOverlayFix`) | The game's own flags for the Steam overlay (`--in-process-gpu`). |
 | `extraChromiumFlags` | Extra Chromium switches, for example `["ignore-gpu-blocklist"]`. |
 
@@ -83,8 +84,14 @@ Each patch is tied to an exact piece of the shipped code. If a game update chang
 
 - On the Steam game and on the Electron 44 copy, with a real account: FPS, frame times and CPU in combat, sign-in, fullscreen screenshots.
 - On a copy of the game without signing in: each patch on its own, F11/Alt+Enter/F12, window memory, minimize and restore.
-- Electron 44 copy: launched with Steam's extra launch argument, fullscreen without title bar, `disableAnalytics`, `engineTaskFix` synthetic tests.
-- Not tested: the Steam overlay itself (needs the launch option above, then Shift+Tab), Steam purchases on Electron 44 (needs a real purchase; the purchase callback is registered the same way, but a real purchase has not been made), `engineTaskFix` on a real account.
+- Electron 44 copy: launched with Steam's extra launch argument, fullscreen without title bar, `disableAnalytics`, the WebGL renderer on a real account.
+- Not tested: the Steam overlay itself (needs the launch option above, then Shift+Tab), Steam purchases on Electron 44 (needs a real purchase; the purchase callback is registered the same way, but a real purchase has not been made), `glUniformCache`.
+
+## What did not work
+
+- **Faster engine timer list**: Stencyl walks thousands of timers 100 times a second and removes finished ones with `indexOf` + `splice`. Two versions of a one-pass replacement passed synthetic tests but broke the real game during sign-in (frozen game loop). Removed.
+- **Deferred local save**: moving Stencyl's local save write (~40 ms) to idle time made the game request saves over and over and froze it. The game relies on the save finishing immediately. Removed.
+- The save itself (about every 10 s) and Stencyl's per-actor timers remain the main sources of occasional long frames; they are game code.
 
 ## How it works
 

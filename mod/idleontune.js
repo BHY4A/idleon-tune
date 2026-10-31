@@ -52,6 +52,49 @@
     byKey.set(key, bitmap);
   };
 
+  // WebGL uniform cache: OpenFL re-sends every shader parameter before every
+  // object. A uniform keeps its value until it is set again, so sending the
+  // value it already has is pure overhead; skip those calls.
+  if (cfg.renderer === "webgl" && cfg.glUniformCache) {
+    var last = new WeakMap(); // WebGLUniformLocation -> last values
+    var same = function (loc, vals) {
+      var prev = last.get(loc);
+      if (prev && prev.length === vals.length) {
+        var i = 0;
+        while (i < vals.length && prev[i] === vals[i]) i++;
+        if (i === vals.length) return true;
+      }
+      last.set(loc, Array.prototype.slice.call(vals));
+      return false;
+    };
+    var wrapScalar = function (proto, name) {
+      var orig = proto[name];
+      if (!orig) return;
+      proto[name] = function (loc) {
+        if (loc && same(loc, Array.prototype.slice.call(arguments, 1))) return;
+        return orig.apply(this, arguments);
+      };
+    };
+    var wrapVector = function (proto, name, matrix) {
+      var orig = proto[name];
+      if (!orig) return;
+      proto[name] = function (loc, a, b) {
+        var data = matrix ? b : a;
+        // Only the plain (location, [transpose,] data) form is cached.
+        if (loc && data && arguments.length === (matrix ? 3 : 2) && same(loc, matrix ? [a].concat(Array.prototype.slice.call(data)) : data)) return;
+        if (loc) last.delete(loc);
+        return orig.apply(this, arguments);
+      };
+    };
+    [window.WebGLRenderingContext, window.WebGL2RenderingContext].forEach(function (ctx) {
+      if (!ctx) return;
+      var p = ctx.prototype;
+      ["uniform1f", "uniform2f", "uniform3f", "uniform4f", "uniform1i", "uniform2i", "uniform3i", "uniform4i"].forEach(function (n) { wrapScalar(p, n); });
+      ["uniform1fv", "uniform2fv", "uniform3fv", "uniform4fv", "uniform1iv", "uniform2iv", "uniform3iv", "uniform4iv"].forEach(function (n) { wrapVector(p, n, false); });
+      ["uniformMatrix2fv", "uniformMatrix3fv", "uniformMatrix4fv"].forEach(function (n) { wrapVector(p, n, true); });
+    });
+  }
+
   // Small notice in the corner (screenshots etc.).
   var toastTimer = null;
   function toast(text) {
